@@ -1,0 +1,84 @@
+---
+title: "MLProject"
+author: "Jacob Novak"
+date: "Tuesday, September 16, 2014"
+output: html_document
+---
+
+Practical Machine Learning Project Description.
+The data for this project come from this source: <http://groupware.les.inf.puc-rio.br/har>.
+
+There are 4 basic parts:
+
+1. Data Preprocessing.
+
+   In this step we eliminate all columns with NA in it, user name column, and time      stamp columns.
+   
+2. Model building.
+
+   In this step we experiment with several models like rpart, rf, and gbm to choose a model with the best accuracy.
+   
+3. Cross-validation step.
+
+4. Compare models' performance.
+
+5. Prediction for the **test** data set.
+
+Based on the evaluation Random Forest / GBM present much better accuracy.
+
+So, use RF model to predict the test data set results:
+
+They are : BABAAEDBAABCBAEEABBB
+
+```{r}
+library(caret)
+library(ggplot2)
+setwd("C:/MLCoursera/Practical ML/Project")
+trnData = read.csv("pml-training.csv")  # read csv file 
+testData = read.csv("pml-testing.csv")  # read csv file 
+# Clean up the data. 
+# 1. First 5 columns are not usefull
+trnData = trnData[,-c(1:5)]
+testData = testData[,-c(1:5)]
+# 2. Delete empty and almost empty columns.
+badcols = nearZeroVar(trnData)
+trnData <- trnData[, -badcols]
+testData <- testData[, -badcols]
+# 3. Delete all columns with NA
+NaFld <- apply(trnData, 2, function(x) { length (x[x=='NA']) > 0 } )
+trnData=trnData[,which(NaFld==FALSE)]
+testData=testData[,which(NaFld==FALSE)]
+# Split the dataset into training/ cross validation DS 75%/25%
+inTrain=createDataPartition(y=trnData$classe,p=0.75,list=FALSE)
+Xtrain = trnData[inTrain,]
+CVtrain = trnData[-inTrain,]
+
+
+# Build models using 3 methods: rpart,rf,gbm on training data set
+# 1. Use rpart
+modelTreeFit = train(Xtrain$classe ~ ., data = Xtrain, method = "rpart")
+# 2. Random Forest
+ctrl = trainControl(method = "cv", number = 4, allowParallel = TRUE)
+modelRfFit = train(Xtrain$classe ~ ., data = Xtrain, method = "rf", trControl=ctrl)
+# 3. boost with tree
+modelGbmFit = train(Xtrain$classe ~ ., data = Xtrain, method = "gbm", trControl=ctrl, verbose=FALSE)
+
+# Cross validation
+predTree = predict(modelTreeFit, CVtrain)
+predRf = predict(modelRfFit, CVtrain)
+predGbm = predict(modelGbmFit, CVtrain)
+
+# Comparing accuracy
+confusionMatrix(predTree, CVtrain$classe)
+confusionMatrix(predRf, CVtrain$classe)
+confusionMatrix(predGbm, CVtrain$classe)
+
+# predicting test cases
+predTestTree = predict(modelTreeFit, testData)
+predTestRf = predict(modelRfFit, testData)
+predTestGbm = predict(modelGbmFit, testData)
+
+sprintf ("Predictions using rpart - %s",paste(predTestTree,collapse=','))
+sprintf ("Predictions using RF    - %s",paste(predTestRf,collapse=','))
+sprintf ("Predictions using GBM   - %s",paste(predTestGbm,collapse=','))
+```
